@@ -10,7 +10,7 @@
 		"Other"
 	],
 	"activationEvents": [
-		"onCommand:cucumber-xray-connector.helloWorld"
+		"onView:feature_treeview"
 	],
 	"main": "./dist/extension.js",
 	"contributes": {
@@ -19,7 +19,34 @@
 				"command": "cucumber-xray-connector.helloWorld",
 				"title": "Hello World"
 			}
-		]
+		],
+		"viewsContainers": {
+			"activitybar": [
+				{
+					"id": "cucumber-explorer",
+					"title": "Cucumber explorer",
+					"icon": "resources/cucumber_bn.svg"
+				}
+			]
+		},
+		"views": {
+			"cucumber-explorer": [
+				{
+					"id": "feature_treeview",
+					"name": "Features"
+				}
+			]
+		},
+		"configuration": {
+			"title": "Cucumber Xray Connector",
+			"properties": {
+			  "cucumber-xray-connector.features.path": {
+				"type": "string",
+				"default": "code/config_test/e2e/definitions/cypress/cypress/integration",
+				"description": "Cucumber features path location"
+			  }
+			}
+		  }
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run package",
