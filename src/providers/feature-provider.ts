@@ -1,10 +1,11 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as fileUtils from './fileUtils';
+import * as fileUtils from '../fileUtils';
 
 
-export class NodeDependenciesProvider implements vscode.TreeDataProvider<Dependency> {
+export class FeatureProvider implements vscode.TreeDataProvider<Dependency> {
+  
   constructor() {}
 
   getTreeItem(element: Dependency): vscode.TreeItem {
@@ -46,20 +47,13 @@ export class NodeDependenciesProvider implements vscode.TreeDataProvider<Depende
     });
 
     return files;
+  }
 
-    /*if(xrayCOnfigJson.featurePath){
-      const toDep = (moduleName: string, version: string): Dependency => {
-        if (this.pathExists(path.join(vscode.workspace.workspaceFolders[0].uri.path.substring(1), 'node_modules', moduleName))) {
-          return new Dependency(
-            moduleName,
-            "EPIC 1"
-          );
-        } else {
-          return new Dependency(moduleName, "EPIC 2");
-        }
-      };
-    }*/
+  private _onDidChangeTreeData: vscode.EventEmitter<Dependency | undefined | null | void> = new vscode.EventEmitter<Dependency | undefined | null | void>();
+  readonly onDidChangeTreeData: vscode.Event<Dependency | undefined | null | void> = this._onDidChangeTreeData.event;
 
+  refresh(): void {
+    this._onDidChangeTreeData.fire();
   }
 }
 
