@@ -1,21 +1,26 @@
-import { getXrayConfiguration } from "./extension";
+import { getXrayConfiguration, getConfigurationProvider } from "./extension";
 import axios from 'axios';
 import * as https from 'https';
 import * as vscode from 'vscode';
 import { TestPlan } from "./model/testPlan";
 import { saveXrayConfBlobs, extractXrayZipFile } from './fileUtils';
 import { Feature } from "./model/feature";
+import { ConfigurationFields } from "./providers/configuration-provider";
 
 const CancelToken = axios.CancelToken;
 const source = CancelToken.source();
 
+
 // Perform JIRA XRAY request
 async function request(url: string, options: any): Promise<any> {
 
-     options.auth = {
-       username: "davidcag",
-       password: "GS5.ajzcPlexus9"
-     }
+  let pwd = getConfigurationProvider().getPassword();
+  let username = getConfigurationProvider().getUsername();
+
+  options.auth = {
+    username: username,
+    password: pwd
+  }
     
   const httpsAgent = new https.Agent({
     rejectUnauthorized: false,
@@ -41,15 +46,26 @@ function cancelRequest() {
 }
 
 
-export function loadTestPlans() : Thenable<void | TestPlan[]> {
+export function loadTestPlans(workspaceId : number, forceUpdate : boolean) : Thenable<void | TestPlan[]> {
 
-    if(getXrayConfiguration().dueTimestamp < new Date().getTime()){
+    let workspaceConf = getXrayConfiguration()[workspaceId];
+    if(forceUpdate || workspaceConf.dueTimestamp < new Date().getTime()){
 
-      console.log(`CONF CADUCADA: ${ new Date(getXrayConfiguration().dueTimestamp)}`);
+      console.log(`CONF CADUCADA: ${ new Date(workspaceConf.dueTimestamp)}`);
 
-      let endpoint : string = getXrayConfiguration().jiraEndpoint;
-      let projectId : string = getXrayConfiguration().jiraKey;
-      let jql: string = encodeURI(`project = ${projectId} AND issuetype = "Test Plan"`);
+
+      const configuration = getConfigurationProvider();
+      
+      //configuration.update(<SETTING_NAME>, <SETTING_VALUE>, vscode.ConfigurationTarget.WorkspaceFolder).then(() => {
+      //  // take action here
+      //});
+
+      let endpoint = configuration.getProperty(ConfigurationFields.JIRA_ENDPOINT);
+      if (endpoint === undefined){
+        return Promise.resolve(workspaceConf.blobs);  // MISSCONFIGURED PROJECT
+      }
+      let projectKey : string = configuration.getProperty(ConfigurationFields.JIRA_PROJECT_KEY) ?? "";
+      let jql: string = encodeURI(`project = ${projectKey} AND issuetype = "Test Plan"`);
       let testPlansUrl: string = `${endpoint}/rest/api/2/search?jql=${jql}`;
 
       const req = request(testPlansUrl, {});
@@ -91,18 +107,18 @@ export function loadTestPlans() : Thenable<void | TestPlan[]> {
 
           return Promise.all(zipPromises).then(() => {
             progress.report({ increment: 100, message: `Download completed! Saving data...` });
-            saveXrayConfBlobs(data);
-            return Promise.resolve(data);
+            let updatedData = saveXrayConfBlobs(workspaceId, data);
+            return Promise.resolve(updatedData);
           });
       }).catch((error) => {
     
           vscode.window.showErrorMessage(`No se han podido recuperar los cambios de Jira Xray: ${endpoint}`);
           console.log(error);
-          return Promise.resolve(getXrayConfiguration().blobs);
+          return Promise.resolve(workspaceConf.blobs);
       });
     });
   }
   else{
-    return Promise.resolve(getXrayConfiguration().blobs);
+    return Promise.resolve(workspaceConf.blobs);
   }
 }

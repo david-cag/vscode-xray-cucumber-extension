@@ -18,8 +18,9 @@ function getThemeColor(status : FeatureStatus) : string {
     switch(status){
         case FeatureStatus.NEW: color = "gitDecoration.untrackedResourceForeground"; break;
         case FeatureStatus.COMMITED: color = "stageModifiedResourceForeground"; break;
-        case FeatureStatus.UPDATED: color = "gitDecoration.modifiedResourceForeground"; break;
+        case FeatureStatus.MODIFIED: color = "gitDecoration.modifiedResourceForeground"; break;
         case FeatureStatus.DELETED: color = "gitDecoration.deletedResourceForeground"; break;
+        case FeatureStatus.LINKED: color = "stageModifiedResourceForeground"; break;
         default : color = "gitDecoration.addedResourceForeground";
     }
     return color;

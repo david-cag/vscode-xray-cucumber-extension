@@ -20,8 +20,10 @@ export class Feature {
 
 export enum FeatureStatus {
     NEW = "NEW",
-    UPDATED = "UPDATED",
+    MODIFIED = "MODIFIED",
     DELETED = "DELETED",
-    COMMITED = "COMMITED"
+    COMMITED = "COMMITED",
+    UNTRACKED = "UNTRACKED",
+    LINKED = "LINKED"
 }
 
