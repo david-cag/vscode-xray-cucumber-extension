@@ -1,6 +1,6 @@
 # VS Code Cucumber Extension
 
-![Cucumber logo](resources/doc/logo.png)
+![Cucumber logo](//logo.png)
 
 This extension provides features to sync Xray Test Plans against your source codeproject and keep track of feature file changes (cucumber specs).
 
@@ -15,10 +15,10 @@ This extension provides features to sync Xray Test Plans against your source cod
 After installing the extension you need to configure Xray connection. You may find Xray connection options under Extension settings menu:
 - `File > Preferences > Settings`
 
-![Extensions](resources/doc/extensions.png)
+![Extensions](//extensions.png)
 - Under Cucumber Explorer, click on `More Actions...` button:
 
-![More actions](resources/doc/moreactions.png)
+![More actions](//moreactions.png)
 
 ### Settings variables
 
@@ -39,20 +39,20 @@ To persist your JIRA account settings, password value is saved inside VSCode sec
 
 To set or update your JIRA account settings you can request it under the options submenu of the Cucumber Explorer Views:
 
-![Jira Crendetials](resources/doc/jiraCredentials.png)
+![Jira Crendetials](//jiraCredentials.png)
 
 Username will be prompted. If defined in Settings, it will be suggested and, if changed, it will be updated also:
 
-![Jira Crendetials : User](resources/doc/jiraCredentialsUser.png)
+![Jira Crendetials : User](//jiraCredentialsUser.png)
 
 After username, password will be prompted. Password value will be never showed. If changed, secret vault will be updated. If don't, password will remain unchanged:
-![Jira Crendetials : Password](resources/doc/jiraCredentialsPwd.png)
+![Jira Crendetials : Password](//jiraCredentialsPwd.png)
 
 ## Usage
 ---
-This plugin enables a new Explorer view on the sidebar. This Explorer is splitted in two views to track local features and remote Test Suites. Click the new icon ![Cucumber icon](resources/doc/cucumber.png) to display it:
+This plugin enables a new Explorer view on the sidebar. This Explorer is splitted in two views to track local features and remote Test Suites. Click the new icon ![Cucumber icon](//cucumber.png) to display it:
 
-![Explorer View](resources/doc/explorerView.png)
+![Explorer View](//explorerView.png)
 
 ### Features Panel
 
@@ -70,7 +70,7 @@ Every will be decorated with labels to track different file status:
 
 This panel shows your remote Xray Test Suites. Every parent folder will represent an existent Test Plan in JIRA and behind them you will one or several features associated with every Test defined in the TestPlan. Xray Cucumber Extension automatically connects to Xray instance to retrieve lates changes from your configured JIRA Project ID once you access to the Cucumber Explorer and it will be refreshed every time you track a change.
 
-> Data is cached by default to 5 minutes to prevent excesive traffic against your JIRA instance. You can change that value in Settings menu or force update clicking Xray refresh button ![Refresh](resources/doc/refreshBtn.png)
+> Data is cached by default to 5 minutes to prevent excesive traffic against your JIRA instance. You can change that value in Settings menu or force update clicking Xray refresh button ![Refresh](//refreshBtn.png)
 
 This panel shows the last test suites available in your Xray project. Under every Test Suite you may find one or several features associated with a TestCase of your Xray TestPlan. In this view you will be able to check the sync status of every file and perform actions against your local files:
 
@@ -101,16 +101,16 @@ Every scenario will be explained above:
 
 A feature file may be defined locally meanwhile there is not functional definition set at Xray project.
 This files are tagged as <span style="color:green">Untracked</span> in the Feature View. No actions can be done with this file but are candidates to be tracked against a remote file. 
-![untrackedBtns](resources/doc/scenarioUntracked.png)
+![untrackedBtns](//scenarioUntracked.png)
 
 ### Only remoted test defined
 
-A test may be defined remotely but there is no real implementation locally yet. Test Suite panel will show as a tree the Test Plans that contains that test. Developers will have the option to recreate a new local test linked to it. Hovering this features, developer will have the availability of creating a local copy of that feature or linking it against an existent local file: ![downloadBtn](resources/doc/downloadBtn.png)
+A test may be defined remotely but there is no real implementation locally yet. Test Suite panel will show as a tree the Test Plans that contains that test. Developers will have the option to recreate a new local test linked to it. Hovering this features, developer will have the availability of creating a local copy of that feature or linking it against an existent local file: ![downloadBtn](//downloadBtn.png)
 A copy of the file will be created on the default features folder.
 
 ### Untracked changes between local & remote environments
 
-Local and remote files should be tracked to enable diff comparison and change upgrades. In this scenario, if a local feature file matchs against a remote test, develop can track both files selecting the feature file and clicking the Link action: ![LinkBtn](resources/doc/linkBtn.png). A dialog will appear where you can select the local candidate file. You would be able to unlink ![UnlinkBtn](resources/doc/unlinkBtn.png) the relationship if it's wrong or link again the feature against another local file but **A REMOTE FILE CAN BE ATTACHED TO A UNIQUE LOCAL FILE**.
+Local and remote files should be tracked to enable diff comparison and change upgrades. In this scenario, if a local feature file matchs against a remote test, develop can track both files selecting the feature file and clicking the Link action: ![LinkBtn](//linkBtn.png). A dialog will appear where you can select the local candidate file. You would be able to unlink ![UnlinkBtn](//unlinkBtn.png) the relationship if it's wrong or link again the feature against another local file but **A REMOTE FILE CAN BE ATTACHED TO A UNIQUE LOCAL FILE**.
 
 ### Tracked changes
 

@@ -14,8 +14,8 @@ const source = CancelToken.source();
 // Perform JIRA XRAY request
 async function request(url: string, options: any): Promise<any> {
 
-  let pwd = getConfigurationProvider().getPassword();
-  let username = getConfigurationProvider().getUsername();
+  let pwd = await getConfigurationProvider().getPassword(false);
+  let username = await getConfigurationProvider().getUsername(false);
 
   options.auth = {
     username: username,
@@ -94,7 +94,12 @@ export function loadTestPlans(workspaceId : number, forceUpdate : boolean) : The
             progress.report({ increment: progressStep, message: `Downloading feature ${issue.key}` });
             let testPlan = new TestPlan(issue.key, issue.fields.summary);
             let xrayUrl: string = `${endpoint}/rest/raven/1.0/export/test?keys=${issue.key}&fz=true`;
-            let promise = request(xrayUrl, { responseType: 'arraybuffer' });
+            
+            let promise = request(xrayUrl, { responseType: 'arraybuffer' }).catch((featError) => {
+              progress.report({ increment: progressStep, message: `Skipped ${issue.key}.` });
+              vscode.window.showErrorMessage(`Test Plan unavailable: ${endpoint}. Skipping (${featError})`);
+              console.log(featError);
+            });
             zipPromises.push(promise);
             promise.then((xrayResponse) => {
 
@@ -111,14 +116,21 @@ export function loadTestPlans(workspaceId : number, forceUpdate : boolean) : The
             return Promise.resolve(updatedData);
           });
       }).catch((error) => {
-    
-          vscode.window.showErrorMessage(`No se han podido recuperar los cambios de Jira Xray: ${endpoint}`);
+          let errorMessage;
+          if(error.response){
+            errorMessage = `${error.response.status} - ${error.response.data?.errorMessages}`;
+          }
+          else{
+            errorMessage = error.message;
+          }
+          vscode.window.showErrorMessage(`Connection could not be established to Xray:\n(${errorMessage})`);
           console.log(error);
           return Promise.resolve(workspaceConf.blobs);
       });
     });
   }
   else{
+    console.log("Return cached DATA");
     return Promise.resolve(workspaceConf.blobs);
   }
 }

@@ -6,7 +6,8 @@ import { Feature } from '../model/feature';
 import { Uri } from 'vscode';
 import * as fileUtils from '../fileUtils';
 import * as fs from 'fs';
-import { getConfigurationProvider, triggerFeatureProviderRefresh } from '../extension';
+import { getConfigurationProvider, getXrayFeatureMap, triggerFeatureProviderRefresh } from '../extension';
+import { FeatureItem } from './feature-provider';
 
 export class TestSuiteProvider implements vscode.TreeDataProvider<TestSuite> {
 
@@ -57,10 +58,11 @@ export class TestSuiteProvider implements vscode.TreeDataProvider<TestSuite> {
         }
         else{
           let features : TestSuite[] = [];
-          this.data.find(elm => elm.key === element.id)?.features?.forEach(feature => {
+          let testSuite = this.data.find(elm => elm.key === element.id);
+          testSuite?.features?.forEach(feature => {
             let desc = feature.blob.match(/.*?Feature.*?\n/)?.shift() || feature.blob.substring(0,30);
             features.push(new TestSuite(
-              feature.filename, 
+              testSuite?.key + "_" + feature.filename, 
               element.workspaceId, 
               element.id as string,
               feature.filename, 
@@ -70,8 +72,11 @@ export class TestSuiteProvider implements vscode.TreeDataProvider<TestSuite> {
               feature));
 
               // Link to features
-              if(feature && feature.localFileRef)
-                triggerFeatureProviderRefresh(feature.localFileRef.path.split("/").pop() as string, feature.filename);
+              if(feature && feature.localFileRef){
+                let fp = getXrayFeatureMap(element?.workspaceId ?? 0);
+                let linkedRemoteFiles : string[] | undefined = fp.get(feature.localFileRef.toString());
+                triggerFeatureProviderRefresh(feature.localFileRef.path.split("/").pop() as string, linkedRemoteFiles);
+              }
           });
           return Promise.resolve(features);
         }
@@ -119,8 +124,8 @@ class TestSuite extends vscode.TreeItem {
     this.contextValue = leaf ? (feature?.status) : 'ROOT'; // view TreeItem discrim.
 
     this.iconPath = {
-      light: path.join(__filename, '..', '..', 'resources', 'light', leaf? 'test.svg' :'test-suite.svg'),
-      dark: path.join(__filename, '..', '..', 'resources', 'dark', leaf? 'test.svg' :'test-suite.svg')
+      light: path.join(__filename, '..','..', '..', 'resources', 'light', leaf? 'test.svg' :'test-suite.svg'),
+      dark: path.join(__filename, '..','..', '..', 'resources', 'dark', leaf? 'test.svg' :'test-suite.svg')
     };
   }
 }
@@ -166,7 +171,7 @@ export function TestSuiteDownloadCommandProvider(node : TestSuite):void {
 export function TestSuiteLinkCommandProvider(this: TestSuiteProvider, node : TestSuite): void {
 
   let featuresPath : string = fileUtils.getFeaturesPath(node.workspaceId);
-  
+  let provider = this;
   vscode.window.showOpenDialog({
     defaultUri : Uri.file(`${featuresPath}/${node.label}`),
     canSelectMany : false,
@@ -176,19 +181,33 @@ export function TestSuiteLinkCommandProvider(this: TestSuiteProvider, node : Tes
 
   }).then(uris => {
     fileUtils.mergeBlobReference(node.workspaceId, node.testSuiteKey, node.label, uris?.shift() as vscode.Uri);
-    this.refresh();
+    provider.refresh();
   });
 
 }
 
+export function TestSuiteUnlinkCommandProvider(this: TestSuiteProvider, node : TestSuite): void {
+  
+  let provider = this;
+  vscode.window.showInformationMessage("Do you want to unlink this feature?", "Yes", "No")
+  .then(answer => {
+    if (answer === "Yes") {
+      fileUtils.deleteBlobReference(node.workspaceId, node.testSuiteKey, node.label);
+      triggerFeatureProviderRefresh(node.feature?.localFileRef?.path.split("/").pop() as string);
+      provider.refresh();
+    }
+  })
+}
+
 export function TestSuiteDeleteCommandProvider(this: TestSuiteProvider, node : TestSuite): void {
  
+  let provider = this;
   vscode.window
   .showInformationMessage("Do you want to definitely remove remote feature?", "Yes", "No")
   .then(answer => {
     if (answer === "Yes") {
       fileUtils.deleteXrayConfBlob(node.workspaceId, node.testSuiteKey, node.label);
-      this.refresh();
+      provider.refresh();
     }
   })
 }

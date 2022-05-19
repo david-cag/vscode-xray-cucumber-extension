@@ -1,22 +1,25 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { FeatureItem, FeatureProvider } from './providers/feature-provider';
-import { TestSuiteProvider, TestSuiteDownloadCommandProvider, TestSuiteLinkCommandProvider, TestSuiteDeleteCommandProvider } from './providers/test-suite-provider';
-import { loadXrayConf, deleteBlobReference } from './fileUtils';
+import { TestSuiteProvider, TestSuiteDownloadCommandProvider, TestSuiteLinkCommandProvider, TestSuiteDeleteCommandProvider, TestSuiteUnlinkCommandProvider } from './providers/test-suite-provider';
+import { loadXrayConf, deleteRelatedBlobReference, readDocMarkdown } from './fileUtils';
 import { XrayConf } from './model/xray';
 import { FeatureContentProvider } from './providers/feature-content-provider';
 import { CucumberFileDecorationProvider } from './providers/file-decoration-provider';
 import { WebviewPanel } from 'vscode';
-import { ConfigurationProvider } from './providers/configuration-provider';
+import { ConfigurationFields, ConfigurationProvider } from './providers/configuration-provider';
+
+var md = require('markdown-it')({ html: true});
 
 
 // Xray configuration global file (for every workspaceFolder)
 let xrayConfiguration : XrayConf[];
-let featureMap = new Map<string, string>();
+let featureMap : Map<string, string[]>[] = [];
 let featureProvider : FeatureProvider;
 let testSuitProvider : TestSuiteProvider;
-let welcomePanel : WebviewPanel;
+let welcomePanel : WebviewPanel | null;
 let cucumberStatusBarItem: vscode.StatusBarItem;
 let configurationProvider : ConfigurationProvider;
 
@@ -28,15 +31,11 @@ export function activate(context: vscode.ExtensionContext) {
 	// Initialize configuration provider
 	configurationProvider = new ConfigurationProvider(context);
 
-	welcomePanel = vscode.window.createWebviewPanel(
-	'cucumber-welcome', 			// Identifies the type of the webview. Used internally
-	'Cucumber Extension : Welcome', // Title of the panel displayed to the user
-	vscode.ViewColumn.Beside, 		// Editor column to show the new webview panel in.
-	{} // Webview options. More on these later.
-	);
-
-	// And set its HTML content
-	welcomePanel.webview.html = getWebviewContent();
+	if(configurationProvider.getProperty(ConfigurationFields.SHOW_WELCOME)){
+		// Create Welcome Panel and set its HTML content
+		createWelcomePanel(context);
+		renderWelcomeWebView(context, welcomePanel as WebviewPanel);
+	}
 
 	 const ftscheme = 'feature';
 	 context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider(ftscheme, new FeatureContentProvider()));
@@ -47,6 +46,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 	// Xray Configuration json file
 	xrayConfiguration = loadXrayConf();
+	xrayConfiguration.forEach((_value, index) =>  updateXrayFeatureMap(index));
 
 	// Enable tree view for feature files
 	featureProvider = new FeatureProvider();
@@ -62,6 +62,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 	vscode.commands.registerCommand('cucumber-xray-connector.download-feature', TestSuiteDownloadCommandProvider, testSuitProvider);
 	vscode.commands.registerCommand('cucumber-xray-connector.link-feature', TestSuiteLinkCommandProvider, testSuitProvider);
+	vscode.commands.registerCommand('cucumber-xray-connector.unlink-feature', TestSuiteUnlinkCommandProvider, testSuitProvider);
 	vscode.commands.registerCommand('cucumber-xray-connector.delete-feature', TestSuiteDeleteCommandProvider, testSuitProvider);
 
 	vscode.commands.registerCommand('cucumber-xray-connector.open-settings', () => {
@@ -69,18 +70,23 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	vscode.commands.registerCommand('cucumber-xray-connector.update-credentials', configurationProvider.updateCredentials, configurationProvider);
+	vscode.commands.registerCommand('cucumber-xray-connector.open-doc', () => {
+		if(welcomePanel == undefined || welcomePanel == null)
+			createWelcomePanel(context);
+		renderWelcomeWebView(context, welcomePanel as WebviewPanel);
+	});
 			
 	vscode.window.registerFileDecorationProvider(new CucumberFileDecorationProvider());
 
 	var watcher = vscode.workspace.createFileSystemWatcher("**/*.feature", false, false, false); //glob search string
 
-	let refreshAction = (uri : vscode.Uri) => {
+	let refreshAction = () => {
 		featureProvider.refresh();
 		testSuitProvider.refresh();
 	};
 
 	let refreshActionWithDelete = (uri : vscode.Uri) => {
-		deleteBlobReference(uri);
+		deleteRelatedBlobReference(uri);
 		featureProvider.refresh();
 		testSuitProvider.refresh();
 	};
@@ -94,11 +100,26 @@ export function activate(context: vscode.ExtensionContext) {
 	};
 }
 
+function createWelcomePanel(context: vscode.ExtensionContext) {
+	welcomePanel = vscode.window.createWebviewPanel(
+		'cucumber-welcome',
+		'Cucumber Extension : Welcome',
+		vscode.ViewColumn.One,
+		{
+			localResourceRoots: [vscode.Uri.file(path.join(context.extensionPath, "resources/doc"))]
+		}
+	);
+
+	welcomePanel.onDidDispose(() => {
+		welcomePanel = null;
+	});
+}
+
 // this method is called when your extension is deactivated
 export function deactivate() {
 
 	//Ensure welcome page get closed if it isn't
-	welcomePanel.dispose();
+	welcomePanel = null;
 }
 
 // Return global Xray Configuration
@@ -108,20 +129,30 @@ export function getXrayConfiguration(){
 
 export function updateXrayConfiguration(workspaceIndex : number, configuration : XrayConf){
 	xrayConfiguration[workspaceIndex] = configuration;
-	featureMap = new Map<string, string>();
+	updateXrayFeatureMap(workspaceIndex);
+}
+
+function updateXrayFeatureMap(workspaceIndex: number) {
+	featureMap[workspaceIndex] = new Map<string, string[]>();
 	xrayConfiguration[workspaceIndex].blobs.flatMap(testSuite => testSuite.features).forEach(feature => {
-		if(feature?.localFileRef){
-			featureMap.set(feature?.localFileRef.toString(), feature.filename);
+		if (feature?.localFileRef) {
+			var key = feature?.localFileRef.toString();
+			if (!featureMap[workspaceIndex].has(key)) {
+				featureMap[workspaceIndex].set(key, [feature.filename]);
+			}
+			else {
+				featureMap[workspaceIndex].get(key)?.push(feature.filename);
+			}
 		}
-	})
+	});
 }
 
-export function getXrayFeatureMap(){
-	return featureMap;
+export function getXrayFeatureMap(workspaceIndex : number){
+	return featureMap[workspaceIndex];
 }
 
-export function triggerFeatureProviderRefresh(id : string, epic : string){
-	featureProvider.refresh(id, epic);
+export function triggerFeatureProviderRefresh(id : string, linkedRemoteFiles? : string[]){
+	featureProvider.refresh(id, linkedRemoteFiles);
 }
 
 export function updateStatusBarItem(message : string){
@@ -133,20 +164,38 @@ export function getConfigurationProvider(){
 	return configurationProvider;
 }
 
-function getWebviewContent(): string {
-	return `<!DOCTYPE html>
-	<html lang="en">
-	<head>
-		<meta charset="UTF-8">
-		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<title>Cucumber Extension : Welcome</title>
-	</head>
-	<body>
-		<h3>Welcome to VSCode Cucumber Extension</h3>
-		<ul>
-			<li>1</li>
-			<li>2</li>
-		</ul>
-	</body>
-	</html>`;
+function renderWelcomeWebView(context: vscode.ExtensionContext, webViewPanel : WebviewPanel){
+
+	let html : string = md.render(readDocMarkdown());
+	webViewPanel.webview.html = html;
+	replaceResourceUri(webViewPanel.webview, context, webViewPanel,'logo.png');
+	replaceResourceUri(webViewPanel.webview, context, webViewPanel,'extensions.png');
+	replaceResourceUri(webViewPanel.webview, context, webViewPanel,'moreactions.png');
+	replaceResourceUri(webViewPanel.webview, context, webViewPanel, 'refreshBtn.png');
+	replaceResourceUri(webViewPanel.webview, context, webViewPanel, 'cucumber.png');
+	replaceResourceUri(webViewPanel.webview, context, webViewPanel, 'explorerView.png');
+	replaceResourceUri(webViewPanel.webview, context, webViewPanel, 'jiraCredentials.png');
+	replaceResourceUri(webViewPanel.webview, context, webViewPanel, 'jiraCredentialsUser.png');
+	replaceResourceUri(webViewPanel.webview, context, webViewPanel, 'jiraCredentialsPwd.png');
+
+	// Scenarios
+	replaceResourceUri(webViewPanel.webview, context, webViewPanel, 'scenarioUntracked.png');
+	replaceResourceUri(webViewPanel.webview, context, webViewPanel, 'downloadBtn.png');
+	replaceResourceUri(webViewPanel.webview, context, webViewPanel, 'linkBtn.png');
+	replaceResourceUri(webViewPanel.webview, context, webViewPanel, 'unlinkBtn.png');
 }
+
+function replaceResourceUri(webView : vscode.Webview, context: vscode.ExtensionContext, webViewPanel: vscode.WebviewPanel, resourceName : string) {
+	
+	// Get path to resource on disk
+	const filePath = vscode.Uri.file(
+		path.join(context.extensionPath, 'resources/doc', resourceName)
+	);
+
+	// And get the special URI to use with the webview
+	const uri = webViewPanel.webview.asWebviewUri(filePath);
+
+	webView.html = webView.html.replace("//" + resourceName, uri.toString());
+	
+}
+

@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as fileUtils from '../fileUtils';0
-import { getConfigurationProvider, getXrayFeatureMap } from '../extension';
+import * as fileUtils from '../fileUtils';
+import { getXrayFeatureMap } from '../extension';
 import { getFeaturesPath } from '../fileUtils';
 
 
@@ -10,15 +10,13 @@ export class FeatureProvider implements vscode.TreeDataProvider<FeatureItem> {
   
   features : FeatureItem[] = [];
 
-  constructor() {}
-
   getTreeItem(element: FeatureItem): vscode.TreeItem {
     return element;
   }
 
   getChildren(element?: FeatureItem): Thenable<FeatureItem[]> {
 
-    if(vscode.workspace.workspaceFolders && getConfigurationProvider().checkConfReady()){
+    if(vscode.workspace.workspaceFolders /*&& getConfigurationProvider().checkConfReady()*/){
 
       if(!element && vscode.workspace.workspaceFolders.length > 1){
         // If multiple workspace folders, create a parent folder tree for each
@@ -29,8 +27,8 @@ export class FeatureProvider implements vscode.TreeDataProvider<FeatureItem> {
         let featuresPath : string = fileUtils.getFeaturesPath(workspaceFolderIndex? workspaceFolderIndex : 0);
 
         // Evaluate features only for first multi-room workspace        
-        if (fileUtils.featuresPathExists(0)) {
-          this.features = this.getFeatureFiles(fileUtils.getFeaturesPath(0));
+        if (fileUtils.pathExists(featuresPath)) {
+          this.features = this.getFeatureFiles(featuresPath, workspaceFolderIndex? workspaceFolderIndex : 0);
         } else {
           vscode.window.showErrorMessage(`Xray config: ${featuresPath} not found. Please review xray extension configuration`);
         }
@@ -42,17 +40,17 @@ export class FeatureProvider implements vscode.TreeDataProvider<FeatureItem> {
   /**
    * Read all feature files from config location
    */
-  private getFeatureFiles(featuresPath : string): FeatureItem[] {
+  private getFeatureFiles(featuresPath : string, workspaceIndex : number): FeatureItem[] {
     
     let files : FeatureItem[] = [];
     
     fs.readdirSync(featuresPath).forEach(file => {
       if (path.extname(file) == ".feature"){
-        let featureFile = getXrayFeatureMap().get(vscode.Uri.file(path.join(featuresPath, file)).toString());
+        let featureFile = getXrayFeatureMap(workspaceIndex).get(vscode.Uri.file(path.join(featuresPath, file)).toString());
         files.push( new FeatureItem(
-          vscode.Uri.parse(`cucumber:style/UNTRACKED/${file}`),
+          featureFile? vscode.Uri.parse(`cucumber:style/LINKED/${file}`) : vscode.Uri.parse(`cucumber:style/UNTRACKED/${file}`),
           file,
-          featureFile? featureFile : "Untracked"
+          featureFile? featureFile.join(",") : "Untracked"
         ));
       }
     });
@@ -63,13 +61,20 @@ export class FeatureProvider implements vscode.TreeDataProvider<FeatureItem> {
   private _onDidChangeTreeData: vscode.EventEmitter<FeatureItem | undefined | null | void> = new vscode.EventEmitter<FeatureItem | undefined | null | void>();
   readonly onDidChangeTreeData: vscode.Event<FeatureItem | undefined | null | void> = this._onDidChangeTreeData.event;
 
-  refresh(id?: string, epic?: string): void {
+  refresh(id?: string, linkedRemoteFiles? : string[]): void {
     let feature : FeatureItem | undefined;
     if(id){
       feature = this.features.find(f => f.id == id);
       if(feature){
-        feature.setFields(id, epic || "");
+        
+        if(linkedRemoteFiles){
+          feature.setFields(id, linkedRemoteFiles.join(","));
         feature.resourceUri = vscode.Uri.parse(`cucumber:style/LINKED/${id}`);
+        }
+        else{
+          feature.setFields(id, "Untracked");
+          feature.resourceUri = vscode.Uri.parse(`cucumber:style/UNTRACKED/${id}`);
+        }
       }
     }
     this._onDidChangeTreeData.fire(feature);
@@ -100,8 +105,8 @@ export class FeatureItem extends vscode.TreeItem {
   }
 
   iconPath = {
-    light: path.join(__filename, '..', '..', 'resources', 'light', 'test.svg'),
-    dark: path.join(__filename, '..', '..','resources', 'dark', 'test.svg')
+    light: path.join(__filename, '..','..', '..', 'resources', 'light', 'test.svg'),
+    dark: path.join(__filename, '..','..', '..','resources', 'dark', 'test.svg')
   };
 }
 

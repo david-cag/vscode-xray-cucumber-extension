@@ -1,5 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import * as glob from 'fast-glob';
+
 import { XrayConf } from './model/xray';
 import { TestPlan } from './model/testPlan';
 import { Feature, FeatureStatus } from './model/feature';
@@ -9,6 +11,17 @@ import { ConfigurationFields } from './providers/configuration-provider';
 
 var md5 = require('md5');
 var AdmZip = require("adm-zip");
+
+var globPathMap = new Map<string, string>();
+
+function URIReviver(_key: string, value: any){
+
+    if(value.$mid == 1){
+        return Uri.from(value);
+    }
+    else
+        return value;
+}
 
 export function pathExists(p: string): boolean {
 
@@ -31,12 +44,32 @@ export function featuresPathExists(workspaceId : number): boolean {
 
 export function getFeaturesPath(workspaceId : number): string {
 
+    let resultPath = null as any;
+
     if( workspace.workspaceFolders && workspace.workspaceFolders[workspaceId]){
 
         let featuresSubpath = getConfigurationProvider().getProperty(ConfigurationFields.FEATURES_PATH) ?? '';
-        return path.join(workspace.workspaceFolders[workspaceId].uri.path.substring(1), featuresSubpath);
+        if(globPathMap.has(featuresSubpath)){
+            resultPath = globPathMap.get(featuresSubpath) as string;
+        }
+        else{
+            resultPath = glob.sync(featuresSubpath.replace(/\\/g, '/'), 
+            { 
+                cwd: workspace.workspaceFolders[workspaceId].uri.path.substring(1).replace(/\\/g, '/'),
+                deep: 10,
+                absolute : true,
+                onlyDirectories: true 
+            })[0];
+
+            if(resultPath != undefined){
+                globPathMap.set(featuresSubpath, resultPath);
+            }
+            else{
+                resultPath = featuresSubpath;
+            }
+        }
     }
-    return null as any
+    return resultPath;
 }
 
 export function getWorkspaceConfigPath(workspaceId : number): string {
@@ -57,7 +90,7 @@ export function loadXrayConf(): XrayConf[] {
                 // Initialize xray.json
                 fs.writeFileSync(xrayConfigFile, JSON.stringify(new XrayConf(), null, 4));
             }
-            return JSON.parse(fs.readFileSync(xrayConfigFile, { encoding : "utf-8"}));
+            return JSON.parse(fs.readFileSync(xrayConfigFile, { encoding : "utf-8"}), URIReviver);
         }
         catch(exception){
             updateStatusBarItem(`Config xray.json not loaded for ${workspaceFolder.name}`);
@@ -70,9 +103,9 @@ export function loadXrayConf(): XrayConf[] {
 
 export function saveXrayConfBlobs(workspaceIndex : number, blobs: TestPlan[]): TestPlan[]{
 
-    let xrayConfigFile = path.join(getFeaturesPath(workspaceIndex), "xray.json");
+    let xrayConfigFile = path.join(getWorkspaceConfigPath(workspaceIndex), "xray.json");
 
-    let json: XrayConf = JSON.parse(fs.readFileSync(xrayConfigFile, { encoding : "utf-8"}));
+    let json: XrayConf = JSON.parse(fs.readFileSync(xrayConfigFile, { encoding : "utf-8"}), URIReviver);
 
     if(json.blobs.length == 0)
         json.blobs = blobs;
@@ -121,9 +154,8 @@ export function saveXrayConfBlobs(workspaceIndex : number, blobs: TestPlan[]): T
         if(newPlans)
             json.blobs.sort((a, b) => a.key > b.key? 1:-1); // Force re-sort
 
-
     }
-    json.dueTimestamp = Date.now() + 1000 * 60 * 15; // TTL 5 min
+    json.dueTimestamp = Date.now() + 1000 * 60 * 15; // TODO TTL 5 min
     fs.writeFileSync(xrayConfigFile, JSON.stringify(json, null, 4));
     updateXrayConfiguration(workspaceIndex, json);
     return json.blobs;
@@ -131,27 +163,30 @@ export function saveXrayConfBlobs(workspaceIndex : number, blobs: TestPlan[]): T
 
 export function mergeBlobReference(workspaceIndex: number, testPlanKey: string, remoteFileName:string, localFileUri : Uri){
 
-    let xrayConfigFile = path.join(getFeaturesPath(workspaceIndex), "xray.json");
-    let json: XrayConf = JSON.parse(fs.readFileSync(xrayConfigFile, { encoding : "utf-8"}));
+    if(localFileUri){   // Prevent changes if modal dismissed without selecting a file
+        let xrayConfigFile = path.join(getWorkspaceConfigPath(workspaceIndex), "xray.json");
+        let json: XrayConf = JSON.parse(fs.readFileSync(xrayConfigFile, { encoding : "utf-8"}), URIReviver);
+
+        let targetFeature = json.blobs.find(blob => blob.key == testPlanKey)?.features
+            ?.find(feature => feature.filename == remoteFileName);
+        
+        if(targetFeature){
+            targetFeature.localFileRef = localFileUri;
+            targetFeature.status = FeatureStatus.COMMITED;
+
+            fs.writeFileSync(xrayConfigFile, JSON.stringify(json, null, 4));
+            updateXrayConfiguration(workspaceIndex, json);
+        }
+    }
+}
+
+export function deleteBlobReference(workspaceIndex: number, testPlanKey: string, remoteFileName:string) {
+
+    let xrayConfigFile = path.join(getWorkspaceConfigPath(workspaceIndex), "xray.json");
+    let json: XrayConf = JSON.parse(fs.readFileSync(xrayConfigFile, { encoding : "utf-8"}), URIReviver);
 
     let targetFeature = json.blobs.find(blob => blob.key == testPlanKey)?.features
         ?.find(feature => feature.filename == remoteFileName);
-    
-    if(targetFeature){
-        targetFeature.localFileRef = localFileUri;
-        targetFeature.status = FeatureStatus.COMMITED;
-
-        fs.writeFileSync(xrayConfigFile, JSON.stringify(json, null, 4));
-        updateXrayConfiguration(workspaceIndex, json);
-    }
-}
-export function deleteBlobReference(localFileUri : Uri){
-
-    let workspaceIndex = workspace.getWorkspaceFolder(localFileUri)?.index ?? 0;
-    let xrayConfigFile = path.join(getFeaturesPath(workspaceIndex), "xray.json");
-    let json: XrayConf = JSON.parse(fs.readFileSync(xrayConfigFile, { encoding : "utf-8"}));
-
-    let targetFeature = json.blobs.flatMap(blob => blob.features)?.find(feature => feature?.localFileRef?.path == localFileUri.path);
     
     if(targetFeature){
         targetFeature.localFileRef = undefined;
@@ -161,10 +196,28 @@ export function deleteBlobReference(localFileUri : Uri){
     }
 }
 
+export function deleteRelatedBlobReference(localFileUri : Uri){
+
+    let workspaceIndex = workspace.getWorkspaceFolder(localFileUri)?.index ?? 0;
+    let xrayConfigFile = path.join(getWorkspaceConfigPath(workspaceIndex), "xray.json");
+    let json: XrayConf = JSON.parse(fs.readFileSync(xrayConfigFile, { encoding : "utf-8"}), URIReviver);
+
+    let targetFeatures = json.blobs.flatMap(blob => blob.features)?.filter(feature => feature?.localFileRef?.toString() == localFileUri.toString());
+    
+    targetFeatures.forEach((targetFeature : Feature | undefined) => {
+        if(targetFeature){
+            targetFeature.localFileRef = undefined;
+            targetFeature.status = FeatureStatus.NEW;
+            fs.writeFileSync(xrayConfigFile, JSON.stringify(json, null, 4));
+            updateXrayConfiguration(workspaceIndex, json);
+        }
+    }) 
+}
+
 export function deleteXrayConfBlob(workspaceIndex: number, testPlanKey: string, remoteFileName:string){
 
-    let xrayConfigFile = path.join(getFeaturesPath(workspaceIndex), "xray.json");
-    let json: XrayConf = JSON.parse(fs.readFileSync(xrayConfigFile, { encoding : "utf-8"}));
+    let xrayConfigFile = path.join(getWorkspaceConfigPath(workspaceIndex), "xray.json");
+    let json: XrayConf = JSON.parse(fs.readFileSync(xrayConfigFile, { encoding : "utf-8"}), URIReviver);
 
     let found = false;
     let features = json.blobs.find(blob => blob.key == testPlanKey)?.features;
@@ -199,4 +252,8 @@ export function extractXrayZipFile(data : Buffer): Feature[]{
         result.push(feature);
     });
     return result;
+}
+
+export function readDocMarkdown(){
+    return fs.readFileSync(path.join(__filename,'../../resources/doc/doc.MD'), { encoding : "utf-8"});
 }
