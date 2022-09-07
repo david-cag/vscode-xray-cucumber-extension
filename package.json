@@ -1,9 +1,13 @@
 {
 	"publisher": "dcasagu",
-	"name": "cucumber-xray-connector",
-	"displayName": "cucumber-xray-connector",
-	"description": "Cucumber Xray Connector",
+	"name": "vscode-xray-cucumber-extension",
+	"displayName": "vscode-xray-cucumber-extension",
+	"description": "Xray Cucumber Extension",
 	"version": "0.0.1",
+	"repository": {
+		"type": "git",
+    	"url": "https://github.com/david-cag/vscode-xray-cucumber-extension"
+	},
 	"engines": {
 		"vscode": "^1.63.0"
 	},
@@ -18,53 +22,58 @@
 		"viewsWelcome": [
 			{
 				"view": "feature_treeview",
-				"contents": "No current features found in the project. Start importing one from TestSuites. [(learn more)](https://www.npmjs.com/)"
+				"contents": "No current features found in the project. Start importing one from TestSuites. [(learn more)](https://github.com/david-cag/vscode-xray-cucumber-extension/wiki/)"
 			},
 			{
 				"view": "testsuite_treeview",
-				"contents": "No test suites available. Did you setup cucumber configuration? [learn more](https://www.npmjs.com/).\n[Configure project](command:cucumber-xray-connector.open-settings)"
+				"contents": "No test suites available. Did you setup cucumber configuration? [learn more](https://github.com/david-cag/vscode-xray-cucumber-extension/wiki/).\n[Configure project](command:vscode-xray-cucumber-extension.open-settings)"
 			}
 		],
 		"commands": [
 			{
-				"command": "cucumber-xray-connector.refresh-test-suite",
+				"command": "vscode-xray-cucumber-extension.refresh-test-suite",
 				"title": "Refresh Test Suites",
 				"icon": "$(repo-sync)"
 			},
 			{
-				"command": "cucumber-xray-connector.open-doc",
+				"command": "vscode-xray-cucumber-extension.open-doc",
 				"title": "Help",
 				"icon": "$(question)"
 			},
 			{
-				"command": "cucumber-xray-connector.download-feature",
+				"command": "vscode-xray-cucumber-extension.download-feature",
 				"title": "Download feature",
 				"icon": "$(cloud-download)"
 			},
 			{
-				"command": "cucumber-xray-connector.link-feature",
+				"command": "vscode-xray-cucumber-extension.link-feature",
 				"title": "Link feature",
 				"icon": "$(link)"
 			},
 			{
-				"command": "cucumber-xray-connector.unlink-feature",
+				"command": "vscode-xray-cucumber-extension.unlink-feature",
 				"title": "Unlink feature",
 				"icon": "$(debug-disconnect)"
 			},
 			{
-				"command": "cucumber-xray-connector.delete-feature",
+				"command": "vscode-xray-cucumber-extension.delete-feature",
 				"title": "Delete feature",
 				"icon": "$(trash)"
 			},
 			{
-				"command": "cucumber-xray-connector.open-settings",
+				"command": "vscode-xray-cucumber-extension.open-settings",
 				"title": "Open project settings",
 				"icon": "$(settings-gear)"
 			},
 			{
-				"command": "cucumber-xray-connector.update-credentials",
+				"command": "vscode-xray-cucumber-extension.update-credentials",
 				"title": "Update JIRA credentials",
 				"icon": "$(key)"
+			},
+			{
+				"command": "vscode-xray-cucumber-extension.discard-changes",
+				"title": "Mark changes as resolved",
+				"icon": "$(check)"
 			}
 		],
 		"viewsContainers": {
@@ -91,75 +100,88 @@
 		"menus": {
 			"view/title": [
 				{
-					"command": "cucumber-xray-connector.refresh-test-suite",
+					"command": "vscode-xray-cucumber-extension.refresh-test-suite",
 					"when": "view == testsuite_treeview",
 					"group": "navigation"
 				},
 				{
-					"command": "cucumber-xray-connector.open-settings"
+					"command": "vscode-xray-cucumber-extension.open-settings"
 				},
 				{
-					"command": "cucumber-xray-connector.update-credentials"
+					"command": "vscode-xray-cucumber-extension.update-credentials"
 				},
 				{
-					"command": "cucumber-xray-connector.open-doc",
+					"command": "vscode-xray-cucumber-extension.open-doc",
 					"group": "support"
 				}
 			],
 			"view/item/context": [
 				{
-					"command": "cucumber-xray-connector.download-feature",
+					"command": "vscode-xray-cucumber-extension.download-feature",
 					"when": "view == testsuite_treeview && viewItem == NEW",
 					"group": "inline"
 				},
 				{
-					"command": "cucumber-xray-connector.link-feature",
+					"command": "vscode-xray-cucumber-extension.link-feature",
 					"when": "view == testsuite_treeview && viewItem != ROOT && viewItem != DELETED",
 					"group": "inline"
 				},
 				{
-					"command": "cucumber-xray-connector.unlink-feature",
+					"command": "vscode-xray-cucumber-extension.unlink-feature",
 					"when": "view == testsuite_treeview && viewItem != ROOT && viewItem == COMMITED",
 					"group": "inline"
 				},
 				{
-					"command": "cucumber-xray-connector.delete-feature",
+					"command": "vscode-xray-cucumber-extension.delete-feature",
 					"when": "view == testsuite_treeview && viewItem == DELETED",
 					"group": "inline"
+				},
+				{
+					"command": "vscode-xray-cucumber-extension.discard-changes",
+					"when": "view == testsuite_treeview && viewItem == MODIFIED",
+					"group": "inline"
+				}
+			],
+			"editor/title": [
+				{
+					"command": "vscode-xray-cucumber-extension.discard-changes",
+					"when" : "resourceScheme == feature",
+					"group": "navigation"
+
 				}
 			]
 		},
 		"configuration": {
-			"title": "Cucumber Xray Connector",
+			"title": "Xray Cucumber Extension",
 			"properties": {
-				"cucumber-xray-connector.features.path": {
+				"vscode-xray-cucumber-extension.features.path": {
 					"type": "string",
 					"default": "**/config_test/e2e/definitions/cypress/cypress/integration",
 					"description": "Cucumber features path location. You can use globs"
 				},
-				"cucumber-xray-connector.jira.username": {
+				"vscode-xray-cucumber-extension.jira.username": {
 					"type": "string",
 					"description": "JIRA Username"
 				},
-				"cucumber-xray-connector.jira.projectkey": {
+				"vscode-xray-cucumber-extension.jira.projectkey": {
 					"type": "string",
 					"description": "JIRA Key of the project to extract JIRA Test Suites"
 				},
-				"cucumber-xray-connector.jira.endpoint": {
+				"vscode-xray-cucumber-extension.jira.endpoint": {
 					"type": "string",
 					"description": "JIRA Endpoint (ex: https://your-domain.atlassian.net)"
 				},
-				"cucumber-xray-connector.jira.cache_ttl": {
+				"vscode-xray-cucumber-extension.jira.cache_ttl": {
 					"type": "integer",
 					"default": 300,
 					"description": "Cache TTL for JIRA sync requests (in seconds)"
 				},
-				"cucumber-xray-connector.features.merged": {
+				"vscode-xray-cucumber-extension.features.merged": {
 					"type": "boolean",
 					"default": true,
 					"description": "Merge scenarios with same background on a single feature file (WIP)"
 				},
-				"cucumber-xray-connector.welcome.show": {
+				"vscode-xray-cucumber-extension.welcome.show": {
 					"type": "boolean",
 					"default": true,
 					"description": "Show Welcome page during startup"

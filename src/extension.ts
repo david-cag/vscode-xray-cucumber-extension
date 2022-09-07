@@ -3,7 +3,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { FeatureItem, FeatureProvider } from './providers/feature-provider';
-import { TestSuiteProvider, TestSuiteDownloadCommandProvider, TestSuiteLinkCommandProvider, TestSuiteDeleteCommandProvider, TestSuiteUnlinkCommandProvider } from './providers/test-suite-provider';
+import { TestSuiteProvider, TestSuiteDownloadCommandProvider, TestSuiteLinkCommandProvider, TestSuiteDeleteCommandProvider, TestSuiteUnlinkCommandProvider, TestSuiteDiscardCommandProvider } from './providers/test-suite-provider';
 import { loadXrayConf, deleteRelatedBlobReference, readDocMarkdown } from './fileUtils';
 import { XrayConf } from './model/xray';
 import { FeatureContentProvider } from './providers/feature-content-provider';
@@ -55,27 +55,28 @@ export function activate(context: vscode.ExtensionContext) {
 	// Enable tree view for test suites
 	testSuitProvider = new TestSuiteProvider();
 	vscode.window.registerTreeDataProvider('testsuite_treeview', testSuitProvider);
-	vscode.commands.registerCommand('cucumber-xray-connector.refresh-test-suite', () => {
+	vscode.commands.registerCommand('vscode-xray-cucumber-extension.refresh-test-suite', () => {
      	testSuitProvider.refresh(true);
 	}
 	);
 
-	vscode.commands.registerCommand('cucumber-xray-connector.download-feature', TestSuiteDownloadCommandProvider, testSuitProvider);
-	vscode.commands.registerCommand('cucumber-xray-connector.link-feature', TestSuiteLinkCommandProvider, testSuitProvider);
-	vscode.commands.registerCommand('cucumber-xray-connector.unlink-feature', TestSuiteUnlinkCommandProvider, testSuitProvider);
-	vscode.commands.registerCommand('cucumber-xray-connector.delete-feature', TestSuiteDeleteCommandProvider, testSuitProvider);
+	vscode.commands.registerCommand('vscode-xray-cucumber-extension.download-feature', TestSuiteDownloadCommandProvider, testSuitProvider);
+	vscode.commands.registerCommand('vscode-xray-cucumber-extension.link-feature', TestSuiteLinkCommandProvider, testSuitProvider);
+	vscode.commands.registerCommand('vscode-xray-cucumber-extension.unlink-feature', TestSuiteUnlinkCommandProvider, testSuitProvider);
+	vscode.commands.registerCommand('vscode-xray-cucumber-extension.delete-feature', TestSuiteDeleteCommandProvider, testSuitProvider);
+	vscode.commands.registerCommand('vscode-xray-cucumber-extension.discard-changes', TestSuiteDiscardCommandProvider, testSuitProvider);
 
-	vscode.commands.registerCommand('cucumber-xray-connector.open-settings', () => {
-		vscode.commands.executeCommand("workbench.action.openSettings","Cucumber Xray Connector");
+	vscode.commands.registerCommand('vscode-xray-cucumber-extension.open-settings', () => {
+		vscode.commands.executeCommand("workbench.action.openSettings","Xray Cucumber Extension");
 	});
 
-	vscode.commands.registerCommand('cucumber-xray-connector.update-credentials', configurationProvider.updateCredentials, configurationProvider);
-	vscode.commands.registerCommand('cucumber-xray-connector.open-doc', () => {
+	vscode.commands.registerCommand('vscode-xray-cucumber-extension.update-credentials', configurationProvider.updateCredentials, configurationProvider);
+	vscode.commands.registerCommand('vscode-xray-cucumber-extension.open-doc', () => {
 		if(welcomePanel == undefined || welcomePanel == null)
 			createWelcomePanel(context);
 		renderWelcomeWebView(context, welcomePanel as WebviewPanel);
 	});
-			
+				
 	vscode.window.registerFileDecorationProvider(new CucumberFileDecorationProvider());
 
 	var watcher = vscode.workspace.createFileSystemWatcher("**/*.feature", false, false, false); //glob search string

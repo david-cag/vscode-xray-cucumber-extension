@@ -37,7 +37,7 @@ suite('Extension Test Suite', () => {
 
 async function extensionActivate() {
 
-	const ext = vscode.extensions.getExtension("dcasagu.cucumber-xray-connector");
+	const ext = vscode.extensions.getExtension("dcasagu.vscode-xray-cucumber-extension");
 	await ext?.activate();
 	return ext?.exports;
 }
