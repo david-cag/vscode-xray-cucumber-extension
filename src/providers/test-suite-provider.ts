@@ -8,6 +8,7 @@ import * as fileUtils from '../fileUtils';
 import * as fs from 'fs';
 import { getConfigurationProvider, getXrayFeatureMap, triggerFeatureProviderRefresh } from '../extension';
 import { FeatureItem } from './feature-provider';
+import { discardChanges } from '../fileUtils';
 
 export class TestSuiteProvider implements vscode.TreeDataProvider<TestSuite> {
 
@@ -120,7 +121,7 @@ class TestSuite extends vscode.TreeItem {
     this.tooltip = tooltip;
     this.description = description;
     this.label = label;
-    this.command = leaf && feature? new DiffCommand(id, feature): undefined;
+    this.command = leaf && feature? new DiffCommand(id, feature, workspaceId, testSuiteKey, label): undefined;
     this.contextValue = leaf ? (feature?.status) : 'ROOT'; // view TreeItem discrim.
 
     this.iconPath = {
@@ -136,12 +137,14 @@ class DiffCommand implements vscode.Command {
   title = "Title";
   tooltip = "tooltip";
   arguments = [] as any[];
+  ctx = {};
 
-  constructor(remoteFilename : string, feature : Feature){
+  constructor(remoteFilename : string, feature : Feature, workspaceId : number, testSuiteKey : string, label: string){
     
     let remoteBlobUri : Uri = this.setDiff(remoteFilename, feature.blob);
     let diffName = feature.localFileRef? `${feature.localFileRef.path.split("/").pop()} ↔ ${remoteFilename}`:`${remoteFilename} (Not sync)`;
     this.arguments = [ feature.localFileRef, remoteBlobUri, diffName];
+    this.ctx = {workspaceId, testSuiteKey, label};
   }
 
   setDiff(remoteFilename : string, remoteBlob : string) : vscode.Uri {
@@ -210,4 +213,18 @@ export function TestSuiteDeleteCommandProvider(this: TestSuiteProvider, node : T
       provider.refresh();
     }
   })
+}
+
+export function TestSuiteDiscardCommandProvider(this: TestSuiteProvider, node : TestSuite): void {
+ 
+  let provider = this;
+  let options : vscode.MessageOptions = { detail: 'No additional warnings will be shown if no new remote changes are downloaded', modal: true };
+		vscode.window
+			.showInformationMessage("Do you agree with local/xray discrepancies?", options, "Yes", "No")
+			.then(answer => {
+				if (answer === "Yes") {
+					discardChanges(node.workspaceId, node.testSuiteKey, node.label);
+          provider.refresh();
+				}
+    })
 }

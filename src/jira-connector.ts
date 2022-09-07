@@ -4,8 +4,9 @@ import * as https from 'https';
 import * as vscode from 'vscode';
 import { TestPlan } from "./model/testPlan";
 import { saveXrayConfBlobs, extractXrayZipFile } from './fileUtils';
-import { Feature } from "./model/feature";
+import { Feature, FeatureStatus } from "./model/feature";
 import { ConfigurationFields } from "./providers/configuration-provider";
+import { MessageOptions } from "vscode";
 
 const CancelToken = axios.CancelToken;
 const source = CancelToken.source();
@@ -49,17 +50,14 @@ function cancelRequest() {
 export function loadTestPlans(workspaceId : number, forceUpdate : boolean) : Thenable<void | TestPlan[]> {
 
     let workspaceConf = getXrayConfiguration()[workspaceId];
-    if(forceUpdate || workspaceConf.dueTimestamp < new Date().getTime()){
+    let modifiedFeatures = workspaceConf.blobs.flatMap(blob => blob.features).some(feature => feature?.status == FeatureStatus.MODIFIED);
+        
+    if(!modifiedFeatures && (forceUpdate || workspaceConf.dueTimestamp < new Date().getTime())){
 
       console.log(`CONF CADUCADA: ${ new Date(workspaceConf.dueTimestamp)}`);
 
-
       const configuration = getConfigurationProvider();
       
-      //configuration.update(<SETTING_NAME>, <SETTING_VALUE>, vscode.ConfigurationTarget.WorkspaceFolder).then(() => {
-      //  // take action here
-      //});
-
       let endpoint = configuration.getProperty(ConfigurationFields.JIRA_ENDPOINT);
       if (endpoint === undefined){
         return Promise.resolve(workspaceConf.blobs);  // MISSCONFIGURED PROJECT
@@ -131,6 +129,10 @@ export function loadTestPlans(workspaceId : number, forceUpdate : boolean) : The
   }
   else{
     console.log("Return cached DATA");
+    if(modifiedFeatures){
+      let options : MessageOptions = { detail : "You have currently remote features marked as MODIFIED. Please, review it and 'mark as resolved' before sync", modal : true};
+      vscode.window.showWarningMessage("Unreviewed features", options);
+    }
     return Promise.resolve(workspaceConf.blobs);
   }
 }

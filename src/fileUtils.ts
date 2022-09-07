@@ -1,18 +1,16 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as glob from 'fast-glob';
-
 import { XrayConf } from './model/xray';
 import { TestPlan } from './model/testPlan';
 import { Feature, FeatureStatus } from './model/feature';
 import { updateXrayConfiguration, updateStatusBarItem, getConfigurationProvider } from './extension';
-import { Uri, workspace } from 'vscode';
+import { Memento, Uri, workspace, WorkspaceEdit, WorkspaceFolder } from 'vscode';
 import { ConfigurationFields } from './providers/configuration-provider';
+
 
 var md5 = require('md5');
 var AdmZip = require("adm-zip");
-
-var globPathMap = new Map<string, string>();
 
 function URIReviver(_key: string, value: any){
 
@@ -48,28 +46,20 @@ export function getFeaturesPath(workspaceId : number): string {
 
     if( workspace.workspaceFolders && workspace.workspaceFolders[workspaceId]){
 
-        let featuresSubpath = getConfigurationProvider().getProperty(ConfigurationFields.FEATURES_PATH) ?? '';
-        if(globPathMap.has(featuresSubpath)){
-            resultPath = globPathMap.get(featuresSubpath) as string;
-        }
-        else{
-            resultPath = glob.sync(featuresSubpath.replace(/\\/g, '/'), 
+        resultPath = getConfigurationProvider().getPreprocessedProperty( workspaceId, ConfigurationFields.FEATURES_PATH, globExpressionProcessor);
+    }
+    return resultPath;
+}
+
+function globExpressionProcessor(workspaceId : number, globExpression : string){
+
+    return glob.sync(globExpression.replace(/\\/g, '/'), 
             { 
-                cwd: workspace.workspaceFolders[workspaceId].uri.path.substring(1).replace(/\\/g, '/'),
+                cwd: (workspace.workspaceFolders as WorkspaceFolder[])[workspaceId].uri.path.substring(1).replace(/\\/g, '/'),
                 deep: 10,
                 absolute : true,
                 onlyDirectories: true 
             })[0];
-
-            if(resultPath != undefined){
-                globPathMap.set(featuresSubpath, resultPath);
-            }
-            else{
-                resultPath = featuresSubpath;
-            }
-        }
-    }
-    return resultPath;
 }
 
 export function getWorkspaceConfigPath(workspaceId : number): string {
@@ -180,6 +170,21 @@ export function mergeBlobReference(workspaceIndex: number, testPlanKey: string, 
     }
 }
 
+export function discardChanges(workspaceIndex: number, testPlanKey: string, remoteFileName:string){
+
+    let xrayConfigFile = path.join(getWorkspaceConfigPath(workspaceIndex), "xray.json");
+    let json: XrayConf = JSON.parse(fs.readFileSync(xrayConfigFile, { encoding : "utf-8"}), URIReviver);
+
+    let targetFeature = json.blobs.find(blob => blob.key == testPlanKey)?.features
+        ?.find(feature => feature.filename == remoteFileName);
+
+    if(targetFeature){
+        targetFeature.status = FeatureStatus.COMMITED;
+        fs.writeFileSync(xrayConfigFile, JSON.stringify(json, null, 4));
+        updateXrayConfiguration(workspaceIndex, json);
+    }
+}
+
 export function deleteBlobReference(workspaceIndex: number, testPlanKey: string, remoteFileName:string) {
 
     let xrayConfigFile = path.join(getWorkspaceConfigPath(workspaceIndex), "xray.json");
@@ -187,7 +192,7 @@ export function deleteBlobReference(workspaceIndex: number, testPlanKey: string,
 
     let targetFeature = json.blobs.find(blob => blob.key == testPlanKey)?.features
         ?.find(feature => feature.filename == remoteFileName);
-    
+
     if(targetFeature){
         targetFeature.localFileRef = undefined;
         targetFeature.status = FeatureStatus.NEW;

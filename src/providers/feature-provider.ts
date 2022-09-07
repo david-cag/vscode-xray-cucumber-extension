@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as fileUtils from '../fileUtils';
-import { getXrayFeatureMap } from '../extension';
+import { getConfigurationProvider, getXrayFeatureMap } from '../extension';
 import { getFeaturesPath } from '../fileUtils';
 
 
@@ -16,7 +16,7 @@ export class FeatureProvider implements vscode.TreeDataProvider<FeatureItem> {
 
   getChildren(element?: FeatureItem): Thenable<FeatureItem[]> {
 
-    if(vscode.workspace.workspaceFolders /*&& getConfigurationProvider().checkConfReady()*/){
+    if(vscode.workspace.workspaceFolders && getConfigurationProvider().checkConfReady()){
 
       if(!element && vscode.workspace.workspaceFolders.length > 1){
         // If multiple workspace folders, create a parent folder tree for each
@@ -122,8 +122,8 @@ class OpenFeatureCommand implements vscode.Command {
     this.arguments = [ vscode.Uri.file(path.join(getFeaturesPath(0), filename))];
   }
 
-  setDiff(remoteFilename : string, remoteBlob : string) : vscode.Uri {
+  // setDiff(remoteFilename : string, remoteBlob : string) : vscode.Uri {
 
-    return vscode.Uri.parse(`feature:${remoteFilename}:${Buffer.from(remoteBlob).toString('base64')}`);
-  }
+  //   return vscode.Uri.parse(`feature:${remoteFilename}:${Buffer.from(remoteBlob).toString('base64')}`);
+  // }
 }

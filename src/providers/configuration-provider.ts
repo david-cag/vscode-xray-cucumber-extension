@@ -1,8 +1,8 @@
 
-import { CancellationToken, ConfigurationTarget, window, workspace } from "vscode";
+import { CancellationToken, ConfigurationTarget, window, workspace, ExtensionContext } from "vscode";
 import SecretVault from "../security/secret-vault"
 
-const EXTENSION_CONFIGURATION = "cucumber-xray-connector";
+const EXTENSION_CONFIGURATION = "vscode-xray-cucumber-extension";
 const DEFAULT_ENDPOINT = 'https://your-domain.atlassian.net'; 
 
  export enum  ConfigurationFields {
@@ -16,15 +16,33 @@ const DEFAULT_ENDPOINT = 'https://your-domain.atlassian.net';
  export class ConfigurationProvider {
 
     secretVault : SecretVault;
+    context : ExtensionContext;
 
     constructor(context : any){
             // Initialize and get current instance of our Secret Storage
         SecretVault.init(context)
         this.secretVault = SecretVault.instance;
+        this.context = context;
     }
 
     getProperty(key : ConfigurationFields) : string | undefined {
         return workspace.getConfiguration(EXTENSION_CONFIGURATION).get(key);
+    }
+
+    getPreprocessedProperty(workspaceId : number, key : ConfigurationFields,  fn : (workspaceId : number, rawPropertyValue: string) => string) : string | undefined {
+      
+      let resultValue = this.context.workspaceState.get<string>(key);
+
+      if(resultValue === undefined){
+        let rawValue = this.getProperty(key) ?? '';
+        resultValue =  fn.apply(this, [workspaceId, rawValue]);
+        if(resultValue !== undefined)
+          this.context.workspaceState.update(key, resultValue);
+        else{
+          resultValue = rawValue;
+        }  
+      }
+      return resultValue;
     }
     
     async getOrUpdateProperty(key : ConfigurationFields, inputMessage? : string, force? : boolean){
