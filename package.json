@@ -167,6 +167,9 @@
 			}
 		}
 	},
+	"publishConfig": {
+   		"@david-cag:registry": "https://npm.pkg.github.com"
+ 	}
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
 		"compile": "tsc -p ./",
