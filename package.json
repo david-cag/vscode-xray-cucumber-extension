@@ -1,6 +1,6 @@
 {
 	"publisher": "dcasagu",
-	"name": "cucumber-xray-connector",
+	"name": "@david-cag/vscode-xray-cucumber-extension",
 	"displayName": "cucumber-xray-connector",
 	"description": "Cucumber Xray Connector",
 	"version": "0.0.1",
