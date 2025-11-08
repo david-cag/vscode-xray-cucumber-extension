@@ -10,6 +10,9 @@ export default class SecretVault {
         /*
         Create instance of new AuthSettings.
         */
+        if (!context) {
+            throw new Error('Extension context cannot be null or undefined');
+        }
         SecretVault._instance = new SecretVault(context.secrets)
     }
 
