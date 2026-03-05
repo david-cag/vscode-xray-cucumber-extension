@@ -1,0 +1,72 @@
+name: Publish Extension
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Compile
+      run: npm run compile
+    
+    - name: Install vsce
+      run: npm install -g vsce
+    
+    - name: Package Extension
+      run: vsce package
+    
+    - name: Publish to VS Code Marketplace
+      run: vsce publish -p ${{ secrets.VSCE_PAT }}
+      continue-on-error: true  # Don't fail if marketplace publish fails
+    
+    - name: Get package info
+      id: package
+      run: |
+        echo "name=$(node -p "require('./package.json').name")" >> $GITHUB_OUTPUT
+        echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+    
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: "*.vsix"
+        name: "Release v${{ steps.package.outputs.version }}"
+        body: |
+          ## VS Code Extension v${{ steps.package.outputs.version }}
+          
+          ### Installation Options:
+          
+          **Option 1: VS Code Marketplace**
+          ```
+          ext install dcasagu.vscode-xray-cucumber-extension
+          ```
+          
+          **Option 2: Manual Installation**
+          1. Download the `.vsix` file below
+          2. Open VS Code
+          3. Go to Extensions (Ctrl+Shift+X)
+          4. Click "..." menu → "Install from VSIX..."
+          5. Select the downloaded file
+          
+          **Option 3: Command Line**
+          ```bash
+          code --install-extension ${{ steps.package.outputs.name }}-${{ steps.package.outputs.version }}.vsix
+          ```
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

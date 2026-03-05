@@ -1,0 +1,160 @@
+name: Auto Release VSIX
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Triggers on version tags like v1.0.0, v1.2.3, etc.
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write  # Required for creating releases
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run linting
+      run: npm run lint
+      continue-on-error: false  # Fail build if linting fails
+      
+    - name: Run tests
+      run: npm test
+      continue-on-error: false  # Fail build if tests fail
+      
+    - name: Compile TypeScript
+      run: npm run compile
+      
+    - name: Install vsce globally
+      run: npm install -g @vscode/vsce
+      
+    - name: Package extension
+      run: vsce package
+      
+    - name: Extract package information
+      id: package-info
+      run: |
+        PACKAGE_NAME=$(node -p "require('./package.json').name")
+        PACKAGE_VERSION=$(node -p "require('./package.json').version")
+        DISPLAY_NAME=$(node -p "require('./package.json').displayName")
+        DESCRIPTION=$(node -p "require('./package.json').description")
+        
+        echo "package_name=$PACKAGE_NAME" >> $GITHUB_OUTPUT
+        echo "package_version=$PACKAGE_VERSION" >> $GITHUB_OUTPUT
+        echo "display_name=$DISPLAY_NAME" >> $GITHUB_OUTPUT
+        echo "description=$DESCRIPTION" >> $GITHUB_OUTPUT
+        echo "vsix_filename=${PACKAGE_NAME}-${PACKAGE_VERSION}.vsix" >> $GITHUB_OUTPUT
+        
+    - name: Verify VSIX file exists
+      run: |
+        if [ ! -f "${{ steps.package-info.outputs.vsix_filename }}" ]; then
+          echo "VSIX file not found: ${{ steps.package-info.outputs.vsix_filename }}"
+          ls -la *.vsix || echo "No VSIX files found"
+          exit 1
+        fi
+        echo "VSIX file found: ${{ steps.package-info.outputs.vsix_filename }}"
+        
+    - name: Generate changelog
+      id: changelog
+      run: |
+        # Extract version from tag
+        TAG_VERSION=${GITHUB_REF#refs/tags/}
+        
+        # Create changelog content
+        CHANGELOG_CONTENT="## 🚀 Release ${TAG_VERSION}
+
+        ### 📦 Package Information
+        - **Extension Name**: ${{ steps.package-info.outputs.display_name }}
+        - **Version**: ${{ steps.package-info.outputs.package_version }}
+        - **Package ID**: ${{ steps.package-info.outputs.package_name }}
+
+        ### 📋 Description
+        ${{ steps.package-info.outputs.description }}
+
+        ### 🔧 Installation Instructions
+
+        #### Method 1: VS Code UI
+        1. Download the \`.vsix\` file from the assets below
+        2. Open VS Code
+        3. Go to Extensions view (\`Ctrl+Shift+X\`)
+        4. Click the \`...\` menu in the top-right
+        5. Select \`Install from VSIX...\`
+        6. Choose the downloaded \`.vsix\` file
+
+        #### Method 2: Command Line
+        \`\`\`bash
+        # Download the VSIX file first, then install
+        code --install-extension ${{ steps.package-info.outputs.vsix_filename }}
+        \`\`\`
+
+        #### Method 3: VS Code Terminal
+        \`\`\`bash
+        # From VS Code terminal
+        code --install-extension ./${{ steps.package-info.outputs.vsix_filename }}
+        \`\`\`
+
+        ### 📁 What's Included
+        - Compiled extension ready for installation
+        - All dependencies bundled
+        - Configuration and assets included
+
+        ### 🔄 Updating
+        To update to a newer version, simply install the new VSIX file using the same method.
+
+        ### ❓ Need Help?
+        - Check the [README](https://github.com/${{ github.repository }}/blob/main/README.md) for setup instructions
+        - Report issues in the [Issues section](https://github.com/${{ github.repository }}/issues)
+        - View the source code at [GitHub Repository](https://github.com/${{ github.repository }})
+
+        ---
+        **Built on**: $(date '+%Y-%m-%d %H:%M:%S UTC')  
+        **Commit**: [\`${GITHUB_SHA:0:7}\`](https://github.com/${{ github.repository }}/commit/${GITHUB_SHA})  
+        **Tag**: [\`${TAG_VERSION}\`](https://github.com/${{ github.repository }}/releases/tag/${TAG_VERSION})"
+        
+        # Save to file for the release
+        echo "$CHANGELOG_CONTENT" > RELEASE_NOTES.md
+        
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        name: "🚀 ${{ steps.package-info.outputs.display_name }} v${{ steps.package-info.outputs.package_version }}"
+        body_path: RELEASE_NOTES.md
+        files: |
+          ${{ steps.package-info.outputs.vsix_filename }}
+        draft: false
+        prerelease: false
+        make_latest: true
+        generate_release_notes: true  # This will append auto-generated notes
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Upload VSIX as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: vsix-package
+        path: ${{ steps.package-info.outputs.vsix_filename }}
+        retention-days: 30
+        
+    - name: Post-release summary
+      run: |
+        echo "### 🎉 Release Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **Package**: ${{ steps.package-info.outputs.display_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Version**: ${{ steps.package-info.outputs.package_version }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **VSIX File**: ${{ steps.package-info.outputs.vsix_filename }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Release**: [View Release](https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }})" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📦 Installation" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+        echo "code --install-extension ${{ steps.package-info.outputs.vsix_filename }}" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
