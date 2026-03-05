@@ -1,0 +1,94 @@
+name: Pre-release VSIX
+
+on:
+  push:
+    tags:
+      - 'v*.*.*-alpha.*'  # e.g., v1.0.0-alpha.1
+      - 'v*.*.*-beta.*'   # e.g., v1.0.0-beta.1
+      - 'v*.*.*-rc.*'     # e.g., v1.0.0-rc.1
+
+jobs:
+  pre-release:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Compile TypeScript
+      run: npm run compile
+      
+    - name: Install vsce globally
+      run: npm install -g @vscode/vsce
+      
+    - name: Package extension
+      run: vsce package --pre-release
+      
+    - name: Extract package information
+      id: package-info
+      run: |
+        PACKAGE_NAME=$(node -p "require('./package.json').name")
+        PACKAGE_VERSION=$(node -p "require('./package.json').version")
+        DISPLAY_NAME=$(node -p "require('./package.json').displayName")
+        
+        echo "package_name=$PACKAGE_NAME" >> $GITHUB_OUTPUT
+        echo "package_version=$PACKAGE_VERSION" >> $GITHUB_OUTPUT
+        echo "display_name=$DISPLAY_NAME" >> $GITHUB_OUTPUT
+        echo "vsix_filename=${PACKAGE_NAME}-${PACKAGE_VERSION}.vsix" >> $GITHUB_OUTPUT
+        
+    - name: Determine pre-release type
+      id: pre-release-type
+      run: |
+        TAG_VERSION=${GITHUB_REF#refs/tags/}
+        if [[ "$TAG_VERSION" == *"alpha"* ]]; then
+          echo "type=Alpha" >> $GITHUB_OUTPUT
+          echo "emoji=🧪" >> $GITHUB_OUTPUT
+        elif [[ "$TAG_VERSION" == *"beta"* ]]; then
+          echo "type=Beta" >> $GITHUB_OUTPUT
+          echo "emoji=🔬" >> $GITHUB_OUTPUT
+        elif [[ "$TAG_VERSION" == *"rc"* ]]; then
+          echo "type=Release Candidate" >> $GITHUB_OUTPUT
+          echo "emoji=🚀" >> $GITHUB_OUTPUT
+        else
+          echo "type=Pre-release" >> $GITHUB_OUTPUT
+          echo "emoji=⚠️" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Create Pre-release
+      uses: softprops/action-gh-release@v1
+      with:
+        name: "${{ steps.pre-release-type.outputs.emoji }} ${{ steps.package-info.outputs.display_name }} v${{ steps.package-info.outputs.package_version }} (${{ steps.pre-release-type.outputs.type }})"
+        body: |
+          ## ${{ steps.pre-release-type.outputs.emoji }} ${{ steps.pre-release-type.outputs.type }} v${{ steps.package-info.outputs.package_version }}
+          
+          ⚠️ **This is a pre-release version** - Use at your own risk!
+          
+          ### Installation
+          ```bash
+          code --install-extension ${{ steps.package-info.outputs.vsix_filename }}
+          ```
+          
+          ### What's New
+          - This is a ${{ steps.pre-release-type.outputs.type }} version
+          - Features may be incomplete or unstable
+          - Please report any issues you encounter
+          
+          ### Feedback
+          Please test this pre-release and provide feedback in the [Issues section](https://github.com/${{ github.repository }}/issues).
+        files: ${{ steps.package-info.outputs.vsix_filename }}
+        draft: false
+        prerelease: true
+        make_latest: false
+        token: ${{ secrets.GITHUB_TOKEN }}
